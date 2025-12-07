@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alignment Viewer</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Alignment Viewer</h1>
+    <div class="header-actions">
+      <button onclick="exportProject()">Save Project</button>
+      <label class="btn">Open Project<input type="file" accept=".json" onchange="importProject(this.files[0])" hidden></label>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="input">Input</button>
+    <button class="tab" data-tab="view">Alignment</button>
+  </nav>
+
+  <main>
+    <!-- Input Panel -->
+    <section id="input" class="panel active">
+      <div class="input-section">
+        <h3>Reference Sequence</h3>
+        <div class="input-row">
+          <input type="text" id="ref-accession" placeholder="UniProt accession (e.g., P00533)">
+          <button onclick="fetchUniprot('ref')">Fetch</button>
+          <label class="btn">Open FASTA<input type="file" accept=".fasta,.fa,.fna,.faa" onchange="loadFasta(this.files[0], 'ref')" hidden></label>
+        </div>
+        <textarea id="ref-paste" placeholder="Or paste sequence here (FASTA or raw)"></textarea>
+        <div id="ref-info" class="seq-card hidden"></div>
+      </div>
+
+      <div class="input-section">
+        <h3>Query Sequence</h3>
+        <div class="input-row">
+          <input type="text" id="query-accession" placeholder="UniProt accession">
+          <button onclick="fetchUniprot('query')">Fetch</button>
+          <label class="btn">Open FASTA<input type="file" accept=".fasta,.fa,.fna,.faa" onchange="loadFasta(this.files[0], 'query')" hidden></label>
+        </div>
+        <textarea id="query-paste" placeholder="Or paste sequence here"></textarea>
+        <div id="query-info" class="seq-card hidden"></div>
+      </div>
+
+      <div class="input-section">
+        <label><input type="checkbox" id="is-circular"> Circular DNA (query)</label>
+      </div>
+
+      <button class="primary full-width" onclick="runAlignment()">Run Alignment</button>
+    </section>
+
+    <!-- Alignment View Panel -->
+    <section id="view" class="panel">
+      <div class="view-container">
+        <div class="view-main">
+          <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Search sequence...">
+            <label><input type="checkbox" id="search-regex"> Regex</label>
+            <button onclick="doSearch()">Find</button>
+            <span id="search-info"></span>
+            <button onclick="prevMatch()">←</button>
+            <button onclick="nextMatch()">→</button>
+          </div>
+          <div id="alignment-view"></div>
+        </div>
+        <aside class="view-sidebar">
+          <div id="legend" class="legend hidden"></div>
+          <div class="settings">
+            <h4>Settings</h4>
+            <label>Chars per line
+              <input type="number" id="chars-per-line" value="60" min="20" max="200">
+            </label>
+            <label>Color scheme
+              <select id="color-scheme"></select>
+            </label>
+            <label class="btn small">Load Colors<input type="file" accept=".json" onchange="loadColorScheme(this.files[0])" hidden></label>
+          </div>
+          <div id="stats" class="stats hidden"></div>
+          <div id="ref-features" class="features hidden"></div>
+          <div id="query-features" class="features hidden"></div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <footer id="status-bar" class="hidden">
+    <span>Pos: <b id="status-pos">-</b></span>
+    <span>Ref: <b id="status-ref">-</b></span>
+    <span>Query: <b id="status-query">-</b></span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

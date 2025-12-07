@@ -1,0 +1,15 @@
+{
+  "name": "Nucleotide",
+  "description": "Standard nucleotide coloring",
+  "type": "dna",
+  "colors": {
+    "A": {"bg": "#64dd17", "fg": "#000"},
+    "T": {"bg": "#ff5252", "fg": "#fff"},
+    "U": {"bg": "#ff5252", "fg": "#fff"},
+    "G": {"bg": "#ffab00", "fg": "#000"},
+    "C": {"bg": "#448aff", "fg": "#fff"},
+    "N": {"bg": "#9e9e9e", "fg": "#fff"},
+    "-": {"bg": "transparent", "fg": "#666"},
+    "default": {"bg": "#ddd", "fg": "#333"}
+  }
+}
