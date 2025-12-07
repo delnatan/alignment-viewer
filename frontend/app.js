@@ -6,7 +6,9 @@ const state = {
   colorScheme: null,
   searchMatches: [],
   currentMatch: -1,
-  cursorPos: null
+  cursorPos: null,
+  expandedFeatureGroups: {}, // Track which feature groups are expanded
+  showFeatureTracks: true    // Toggle feature tracks visibility
 };
 
 // API helpers
@@ -178,11 +180,20 @@ function renderAlignment() {
         ${renderSeqRow('Ref', refSlice, ref_indices.slice(i, end), i)}
         ${renderSeqRow('Qry', querySlice, query_indices.slice(i, end), i)}
         ${renderConsensus(refSlice, querySlice)}
+        ${state.showFeatureTracks ? renderFeatureTracks(i, end, charsPerLine) : ''}
       </div>
     </div>`;
   }
 
   container.innerHTML = html;
+
+  // Add click handlers for feature track bars
+  container.querySelectorAll('.feature-track-bar').forEach(bar => {
+    bar.addEventListener('click', () => {
+      const pos = parseInt(bar.dataset.alignStart);
+      if (!isNaN(pos)) setCursor(pos);
+    });
+  });
 }
 
 function handleResidueClick(e) {
@@ -225,6 +236,104 @@ function renderConsensus(ref, query) {
     <span class="seq-label"></span>
     <span class="seq-chars">${chars}</span>
   </div>`;
+}
+
+// Feature track rendering
+function renderFeatureTracks(blockStart, blockEnd, charsPerLine) {
+  const hasRefFeatures = state.ref?.features?.length > 0;
+  const hasQueryFeatures = state.query?.features?.length > 0;
+
+  if (!hasRefFeatures && !hasQueryFeatures) return '';
+
+  const { ref_indices, query_indices } = state.alignment;
+  const charWidth = 16; // Width of each character cell (14px + 2px margin)
+
+  // Get features that overlap with this block
+  const refFeatures = hasRefFeatures ?
+    getVisibleFeatures(state.ref.features, ref_indices, blockStart, blockEnd) : [];
+  const queryFeatures = hasQueryFeatures ?
+    getVisibleFeatures(state.query.features, query_indices, blockStart, blockEnd) : [];
+
+  // Group features by type for paired visualization
+  const featureTypes = new Set([
+    ...refFeatures.map(f => f.type),
+    ...queryFeatures.map(f => f.type)
+  ]);
+
+  if (featureTypes.size === 0) return '';
+
+  let html = '<div class="feature-tracks-pair">';
+
+  // Render ref track
+  html += `<div class="tracks-row">
+    <span class="tracks-row-label">Ref</span>
+    <div class="tracks-row-content">
+      ${renderTrackBars(refFeatures, ref_indices, blockStart, blockEnd, charWidth)}
+    </div>
+  </div>`;
+
+  // Render query track
+  html += `<div class="tracks-row">
+    <span class="tracks-row-label">Qry</span>
+    <div class="tracks-row-content">
+      ${renderTrackBars(queryFeatures, query_indices, blockStart, blockEnd, charWidth)}
+    </div>
+  </div>`;
+
+  html += '</div>';
+  return html;
+}
+
+function getVisibleFeatures(features, indices, blockStart, blockEnd) {
+  // Map sequence positions to alignment positions for this block
+  const result = [];
+
+  for (const feature of features) {
+    // Find alignment positions for this feature
+    let alignStart = null;
+    let alignEnd = null;
+
+    for (let i = blockStart; i < blockEnd; i++) {
+      const seqPos = indices[i];
+      if (seqPos === null) continue;
+
+      if (seqPos >= feature.start && seqPos <= feature.end) {
+        if (alignStart === null) alignStart = i;
+        alignEnd = i;
+      }
+    }
+
+    if (alignStart !== null) {
+      result.push({
+        ...feature,
+        alignStart,
+        alignEnd
+      });
+    }
+  }
+
+  return result;
+}
+
+function renderTrackBars(features, indices, blockStart, blockEnd, charWidth) {
+  if (features.length === 0) return '';
+
+  return features.map(f => {
+    const left = (f.alignStart - blockStart) * charWidth;
+    const width = (f.alignEnd - f.alignStart + 1) * charWidth - 2;
+    const tooltip = `${f.type}: ${f.description} (${f.start + 1}-${f.end + 1})`;
+
+    return `<div class="feature-track-bar"
+      style="left:${left}px;width:${width}px;background:${f.color}"
+      title="${escapeHtml(tooltip)}"
+      data-align-start="${f.alignStart}"></div>`;
+  }).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function getColor(char) {
@@ -279,25 +388,66 @@ function renderFeatures() {
 
 function renderFeatureList(target, seq) {
   const el = document.getElementById(`${target}-features`);
-  if (!seq?.features?.length) {
-    el.classList.add('hidden');
-    return;
+  const targetLabel = target === 'ref' ? 'Reference' : 'Query';
+
+  // Always show the section with add button
+  const features = seq?.features || [];
+
+  // Group features by type
+  const groups = {};
+  for (const f of features) {
+    if (!groups[f.type]) {
+      groups[f.type] = { type: f.type, color: f.color, items: [] };
+    }
+    groups[f.type].items.push(f);
   }
 
-  el.innerHTML = `
-    <h4>${target === 'ref' ? 'Reference' : 'Query'} Features</h4>
-    <div class="feature-list">
-      ${seq.features.map(f => `
-        <div class="feature-item" style="border-left-color:${f.color}" data-start="${f.start}" data-target="${target}">
-          <span class="feature-type">${f.type}</span>
-          <span class="feature-range">${f.start + 1}-${f.end + 1}</span>
+  const groupsHtml = Object.values(groups).map(g => {
+    const groupKey = `${target}-${g.type}`;
+    const isExpanded = state.expandedFeatureGroups[groupKey];
+
+    return `
+      <div class="feature-group ${isExpanded ? 'expanded' : ''}" data-group-key="${groupKey}">
+        <div class="feature-group-header" style="border-left-color:${g.color}" data-group-key="${groupKey}">
+          <span class="feature-group-toggle">▶</span>
+          <span class="feature-group-type">${g.type}</span>
+          <span class="feature-group-count">${g.items.length}</span>
         </div>
-      `).join('')}
+        <div class="feature-group-items">
+          ${g.items.map(f => `
+            <div class="feature-item" style="border-left-color:${f.color}" data-start="${f.start}" data-target="${target}">
+              <span class="feature-range">${f.start + 1}-${f.end + 1}</span>
+              ${f.description ? `<span class="feature-desc" title="${escapeHtml(f.description)}">${f.description}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="features-header">
+      <h4>${targetLabel} Features</h4>
+      <button class="add-feature-btn" data-target="${target}">+ Add</button>
+    </div>
+    <div class="feature-list">
+      ${groupsHtml || '<div class="no-features">No features</div>'}
     </div>
   `;
   el.classList.remove('hidden');
 
-  // Click to navigate
+  // Click handlers for group headers (expand/collapse)
+  el.querySelectorAll('.feature-group-header').forEach(header => {
+    header.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const groupKey = header.dataset.groupKey;
+      state.expandedFeatureGroups[groupKey] = !state.expandedFeatureGroups[groupKey];
+      const group = header.closest('.feature-group');
+      group.classList.toggle('expanded');
+    });
+  });
+
+  // Click to navigate to feature
   el.querySelectorAll('.feature-item').forEach(item => {
     item.addEventListener('click', () => {
       const seqPos = parseInt(item.dataset.start);
@@ -305,6 +455,11 @@ function renderFeatureList(target, seq) {
       const pos = findAlignmentPos(t, seqPos);
       if (pos !== null && pos >= 0) setCursor(pos);
     });
+  });
+
+  // Click handler for add button
+  el.querySelector('.add-feature-btn').addEventListener('click', () => {
+    openFeatureModal(target);
   });
 }
 
@@ -457,4 +612,134 @@ async function loadColorScheme(file) {
   } catch (e) {
     alert(`Invalid color scheme: ${e.message}`);
   }
+}
+
+// Custom Feature Modal
+let currentFeatureTarget = null;
+
+const FEATURE_TYPES = [
+  { type: 'Domain', color: '#9b59b6' },
+  { type: 'Region', color: '#1abc9c' },
+  { type: 'Motif', color: '#e67e22' },
+  { type: 'Binding site', color: '#e74c3c' },
+  { type: 'Active site', color: '#c0392b' },
+  { type: 'Helix', color: '#e91e63' },
+  { type: 'Beta strand', color: '#2196f3' },
+  { type: 'Turn', color: '#4caf50' },
+  { type: 'Modified residue', color: '#27ae60' },
+  { type: 'Signal', color: '#00bcd4' },
+  { type: 'Custom', color: '#95a5a6' }
+];
+
+function openFeatureModal(target) {
+  currentFeatureTarget = target;
+  const modal = document.getElementById('feature-modal');
+  const seq = state[target];
+
+  if (!seq) {
+    alert('Please load a sequence first');
+    return;
+  }
+
+  // Populate type dropdown
+  const typeSelect = document.getElementById('feature-type-select');
+  typeSelect.innerHTML = FEATURE_TYPES.map(t =>
+    `<option value="${t.type}" data-color="${t.color}">${t.type}</option>`
+  ).join('');
+
+  // Set default values
+  document.getElementById('feature-start').value = '1';
+  document.getElementById('feature-end').value = seq.sequence.length;
+  document.getElementById('feature-description').value = '';
+  document.getElementById('feature-color').value = FEATURE_TYPES[0].color;
+  document.getElementById('feature-color-text').value = FEATURE_TYPES[0].color;
+
+  // Update color when type changes
+  typeSelect.onchange = () => {
+    const selected = typeSelect.options[typeSelect.selectedIndex];
+    const color = selected.dataset.color;
+    document.getElementById('feature-color').value = color;
+    document.getElementById('feature-color-text').value = color;
+  };
+
+  modal.classList.add('active');
+}
+
+function closeFeatureModal() {
+  document.getElementById('feature-modal').classList.remove('active');
+  currentFeatureTarget = null;
+}
+
+function syncColorFromPicker() {
+  const color = document.getElementById('feature-color').value;
+  document.getElementById('feature-color-text').value = color;
+}
+
+function syncColorFromText() {
+  const text = document.getElementById('feature-color-text').value;
+  if (/^#[0-9a-fA-F]{6}$/.test(text)) {
+    document.getElementById('feature-color').value = text;
+  }
+}
+
+function addCustomFeature() {
+  if (!currentFeatureTarget) return;
+
+  const seq = state[currentFeatureTarget];
+  if (!seq) return;
+
+  const type = document.getElementById('feature-type-select').value;
+  const start = parseInt(document.getElementById('feature-start').value) - 1; // Convert to 0-indexed
+  const end = parseInt(document.getElementById('feature-end').value) - 1;
+  const description = document.getElementById('feature-description').value.trim();
+  const color = document.getElementById('feature-color').value;
+
+  // Validation
+  if (isNaN(start) || isNaN(end)) {
+    alert('Please enter valid start and end positions');
+    return;
+  }
+
+  if (start < 0 || end < 0 || start >= seq.sequence.length || end >= seq.sequence.length) {
+    alert(`Positions must be between 1 and ${seq.sequence.length}`);
+    return;
+  }
+
+  if (start > end) {
+    alert('Start position must be less than or equal to end position');
+    return;
+  }
+
+  // Create new feature
+  const newFeature = {
+    type,
+    start,
+    end,
+    description: description || type,
+    color
+  };
+
+  // Initialize features array if needed
+  if (!seq.features) {
+    seq.features = [];
+  }
+
+  // Add feature
+  seq.features.push(newFeature);
+
+  // Re-render
+  renderFeatures();
+  renderAlignment();
+
+  closeFeatureModal();
+}
+
+// Toggle feature tracks visibility
+function toggleFeatureTracks() {
+  state.showFeatureTracks = !state.showFeatureTracks;
+  const btn = document.getElementById('toggle-tracks-btn');
+  if (btn) {
+    btn.textContent = state.showFeatureTracks ? 'Hide Tracks' : 'Show Tracks';
+  }
+  renderAlignment();
 }

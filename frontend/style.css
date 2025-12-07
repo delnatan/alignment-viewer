@@ -407,21 +407,343 @@ textarea {
   border-top: 1px solid var(--border);
 }
 
-.feature-list { max-height: 200px; overflow-y: auto; }
+.features-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
 
-.feature-item {
+.features-header h4 {
+  margin-bottom: 0;
+}
+
+.add-feature-btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.add-feature-btn:hover {
+  background: var(--border);
+}
+
+.feature-list { max-height: 300px; overflow-y: auto; }
+
+/* Collapsible feature groups */
+.feature-group {
+  margin-bottom: 0.5rem;
+}
+
+.feature-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
   background: var(--bg-tertiary);
   border-left: 3px solid var(--accent);
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.375rem;
   border-radius: 0 0.375rem 0.375rem 0;
   cursor: pointer;
   font-size: 0.8125rem;
+  transition: background 0.2s;
 }
 
-.feature-item:hover { background: var(--border); }
+.feature-group-header:hover {
+  background: var(--border);
+}
+
+.feature-group-toggle {
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  transition: transform 0.2s;
+}
+
+.feature-group.expanded .feature-group-toggle {
+  transform: rotate(90deg);
+}
+
+.feature-group-type {
+  font-weight: 500;
+  flex: 1;
+}
+
+.feature-group-count {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+}
+
+.feature-group-items {
+  display: none;
+  padding-left: 1rem;
+  margin-top: 0.25rem;
+}
+
+.feature-group.expanded .feature-group-items {
+  display: block;
+}
+
+.feature-item {
+  background: var(--bg);
+  border-left: 2px solid var(--text-dim);
+  padding: 0.375rem 0.625rem;
+  margin-bottom: 0.25rem;
+  border-radius: 0 0.25rem 0.25rem 0;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.feature-item:hover { background: var(--bg-tertiary); }
 .feature-type { font-weight: 500; }
 .feature-range { color: var(--text-muted); margin-left: 0.5rem; }
+.feature-desc {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  margin-top: 0.125rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Feature Tracks beneath sequences */
+.feature-tracks-container {
+  margin-top: 0.5rem;
+  padding-left: 85px; /* Align with sequence chars (block-pos + seq-label width) */
+}
+
+.feature-track {
+  position: relative;
+  height: 12px;
+  margin-bottom: 2px;
+}
+
+.feature-track-label {
+  position: absolute;
+  left: -45px;
+  top: 0;
+  font-size: 0.5625rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  width: 40px;
+  text-align: right;
+}
+
+.feature-track-bar {
+  position: absolute;
+  height: 8px;
+  top: 2px;
+  border-radius: 2px;
+  opacity: 0.85;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.feature-track-bar:hover {
+  opacity: 1;
+  transform: scaleY(1.25);
+  z-index: 1;
+}
+
+.feature-track-bar[title]::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.625rem;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.feature-track-bar:hover[title]::after {
+  opacity: 1;
+}
+
+/* Feature tracks pair container for Ref vs Query */
+.feature-tracks-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--border);
+}
+
+.tracks-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.tracks-row-label {
+  width: 35px;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-align: right;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.tracks-row-content {
+  flex: 1;
+  min-height: 14px;
+  position: relative;
+}
+
+/* Custom Feature Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  width: 100%;
+  max-width: 400px;
+  padding: 1.5rem;
+  transform: scale(0.95);
+  transition: transform 0.2s;
+}
+
+.modal-overlay.active .modal {
+  transform: scale(1);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+}
+
+.modal-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.form-group label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.form-group input,
+.form-group select {
+  padding: 0.625rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.form-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+.color-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.color-input-wrapper input[type="color"] {
+  width: 40px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.375rem;
+  cursor: pointer;
+}
+
+.color-input-wrapper input[type="text"] {
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.modal-footer button {
+  padding: 0.5rem 1rem;
+}
+
+/* No features placeholder */
+.no-features {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-style: italic;
+  padding: 0.5rem;
+}
 
 /* Status Bar */
 footer {
