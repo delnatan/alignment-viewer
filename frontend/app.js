@@ -7,8 +7,9 @@ const state = {
   searchMatches: [],
   currentMatch: -1,
   cursorPos: null,
-  expandedFeatureGroups: {}, // Track which feature groups are expanded
-  showFeatureTracks: true    // Toggle feature tracks visibility
+  expandedFeatureGroups: {}, // Track which feature groups are expanded in sidebar
+  showFeatureTracks: true,   // Toggle feature tracks visibility globally
+  visibleFeatureTypes: {}    // Track visibility of each feature type in tracks
 };
 
 // API helpers
@@ -238,7 +239,7 @@ function renderConsensus(ref, query) {
   </div>`;
 }
 
-// Feature track rendering
+// Feature track rendering - independent tracks per feature type
 function renderFeatureTracks(blockStart, blockEnd, charsPerLine) {
   const hasRefFeatures = state.ref?.features?.length > 0;
   const hasQueryFeatures = state.query?.features?.length > 0;
@@ -247,6 +248,7 @@ function renderFeatureTracks(blockStart, blockEnd, charsPerLine) {
 
   const { ref_indices, query_indices } = state.alignment;
   const charWidth = 16; // Width of each character cell (14px + 2px margin)
+  const blockWidth = (blockEnd - blockStart) * charWidth;
 
   // Get features that overlap with this block
   const refFeatures = hasRefFeatures ?
@@ -254,31 +256,42 @@ function renderFeatureTracks(blockStart, blockEnd, charsPerLine) {
   const queryFeatures = hasQueryFeatures ?
     getVisibleFeatures(state.query.features, query_indices, blockStart, blockEnd) : [];
 
-  // Group features by type for paired visualization
-  const featureTypes = new Set([
-    ...refFeatures.map(f => f.type),
-    ...queryFeatures.map(f => f.type)
-  ]);
+  // Group features by type
+  const featuresByType = {};
+  for (const f of refFeatures) {
+    if (!featuresByType[f.type]) featuresByType[f.type] = { ref: [], query: [], color: f.color };
+    featuresByType[f.type].ref.push(f);
+  }
+  for (const f of queryFeatures) {
+    if (!featuresByType[f.type]) featuresByType[f.type] = { ref: [], query: [], color: f.color };
+    featuresByType[f.type].query.push(f);
+  }
 
-  if (featureTypes.size === 0) return '';
+  const types = Object.keys(featuresByType);
+  if (types.length === 0) return '';
 
-  let html = '<div class="feature-tracks-pair">';
+  // Filter by visibility
+  const visibleTypes = types.filter(t => state.visibleFeatureTypes[t] !== false);
+  if (visibleTypes.length === 0) return '';
 
-  // Render ref track
-  html += `<div class="tracks-row">
-    <span class="tracks-row-label">Ref</span>
-    <div class="tracks-row-content">
-      ${renderTrackBars(refFeatures, ref_indices, blockStart, blockEnd, charWidth)}
-    </div>
-  </div>`;
+  let html = `<div class="feature-tracks-container" style="width:${blockWidth}px">`;
 
-  // Render query track
-  html += `<div class="tracks-row">
-    <span class="tracks-row-label">Qry</span>
-    <div class="tracks-row-content">
-      ${renderTrackBars(queryFeatures, query_indices, blockStart, blockEnd, charWidth)}
-    </div>
-  </div>`;
+  for (const type of visibleTypes) {
+    const group = featuresByType[type];
+    html += `<div class="feature-track-group" data-type="${escapeHtml(type)}">
+      <div class="feature-track-type-row">
+        <span class="feature-track-type-label" style="color:${group.color}">${escapeHtml(type)}</span>
+      </div>
+      <div class="feature-track-lanes">
+        <div class="feature-track-lane" data-seq="ref">
+          ${renderTrackBars(group.ref, ref_indices, blockStart, blockEnd, charWidth, blockWidth)}
+        </div>
+        <div class="feature-track-lane" data-seq="query">
+          ${renderTrackBars(group.query, query_indices, blockStart, blockEnd, charWidth, blockWidth)}
+        </div>
+      </div>
+    </div>`;
+  }
 
   html += '</div>';
   return html;
@@ -315,16 +328,20 @@ function getVisibleFeatures(features, indices, blockStart, blockEnd) {
   return result;
 }
 
-function renderTrackBars(features, indices, blockStart, blockEnd, charWidth) {
+function renderTrackBars(features, indices, blockStart, blockEnd, charWidth, blockWidth) {
   if (features.length === 0) return '';
 
   return features.map(f => {
     const left = (f.alignStart - blockStart) * charWidth;
-    const width = (f.alignEnd - f.alignStart + 1) * charWidth - 2;
-    const tooltip = `${f.type}: ${f.description} (${f.start + 1}-${f.end + 1})`;
+    let width = (f.alignEnd - f.alignStart + 1) * charWidth - 2;
+    // Constrain width to not exceed block boundary
+    if (left + width > blockWidth) {
+      width = blockWidth - left - 2;
+    }
+    const tooltip = `${f.description} (${f.start + 1}-${f.end + 1})`;
 
     return `<div class="feature-track-bar"
-      style="left:${left}px;width:${width}px;background:${f.color}"
+      style="left:${left}px;width:${Math.max(width, 4)}px;background:${f.color}"
       title="${escapeHtml(tooltip)}"
       data-align-start="${f.alignStart}"></div>`;
   }).join('');
@@ -346,16 +363,21 @@ function getColor(char) {
 function renderLegend() {
   const legend = document.getElementById('legend');
   if (!state.ref || !state.query) return;
-  
+
+  const refName = state.ref.name || state.ref.id;
+  const queryName = state.query.name || state.query.id;
+
   legend.innerHTML = `
     <h4>Legend</h4>
     <div class="legend-item">
       <span class="legend-label">Ref</span>
-      <span class="legend-name" title="${state.ref.name || state.ref.id}">${truncate(state.ref.name || state.ref.id, 22)}</span>
+      <span class="legend-name"><span class="legend-name-text">${escapeHtml(truncate(refName, 22))}</span></span>
+      <div class="legend-tooltip">${escapeHtml(refName)}${state.ref.organism ? `<br><em>${escapeHtml(state.ref.organism)}</em>` : ''}</div>
     </div>
     <div class="legend-item">
       <span class="legend-label">Qry</span>
-      <span class="legend-name" title="${state.query.name || state.query.id}">${truncate(state.query.name || state.query.id, 22)}</span>
+      <span class="legend-name"><span class="legend-name-text">${escapeHtml(truncate(queryName, 22))}</span></span>
+      <div class="legend-tooltip">${escapeHtml(queryName)}${state.query.organism ? `<br><em>${escapeHtml(state.query.organism)}</em>` : ''}</div>
     </div>
   `;
   legend.classList.remove('hidden');
@@ -384,6 +406,70 @@ function renderStats() {
 function renderFeatures() {
   renderFeatureList('ref', state.ref);
   renderFeatureList('query', state.query);
+  renderFeatureTrackToggles();
+}
+
+// Render feature type toggles for track visibility
+function renderFeatureTrackToggles() {
+  const container = document.getElementById('feature-track-toggles');
+  if (!container) return;
+
+  // Collect all unique feature types from both sequences
+  const allTypes = new Set();
+  const typeColors = {};
+
+  if (state.ref?.features) {
+    for (const f of state.ref.features) {
+      allTypes.add(f.type);
+      if (!typeColors[f.type]) typeColors[f.type] = f.color;
+    }
+  }
+  if (state.query?.features) {
+    for (const f of state.query.features) {
+      allTypes.add(f.type);
+      if (!typeColors[f.type]) typeColors[f.type] = f.color;
+    }
+  }
+
+  if (allTypes.size === 0) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  // Initialize visibility for new types (default to visible)
+  for (const type of allTypes) {
+    if (state.visibleFeatureTypes[type] === undefined) {
+      state.visibleFeatureTypes[type] = true;
+    }
+  }
+
+  const togglesHtml = Array.from(allTypes).sort().map(type => {
+    const isVisible = state.visibleFeatureTypes[type] !== false;
+    const color = typeColors[type] || '#888';
+    return `
+      <label class="feature-toggle-item" style="border-left-color:${color}">
+        <input type="checkbox" ${isVisible ? 'checked' : ''} data-feature-type="${escapeHtml(type)}">
+        <span class="feature-toggle-name">${escapeHtml(type)}</span>
+      </label>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <h4>Feature Tracks</h4>
+    <div class="feature-toggles-list">
+      ${togglesHtml}
+    </div>
+  `;
+  container.classList.remove('hidden');
+
+  // Add event listeners
+  container.querySelectorAll('input[data-feature-type]').forEach(checkbox => {
+    checkbox.addEventListener('change', (e) => {
+      const type = e.target.dataset.featureType;
+      state.visibleFeatureTypes[type] = e.target.checked;
+      renderAlignment();
+    });
+  });
 }
 
 function renderFeatureList(target, seq) {

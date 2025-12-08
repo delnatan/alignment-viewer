@@ -244,7 +244,7 @@ textarea {
   flex-shrink: 0;
 }
 
-.block-content { overflow-x: auto; }
+.block-content { overflow: visible; }
 
 .seq-row {
   display: flex;
@@ -333,17 +333,24 @@ textarea {
 
 .legend-name {
   color: var(--text);
+  max-width: 180px;
+  display: inline-block;
+}
+
+.legend-name-text {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  position: relative;
-  cursor: help;
 }
 
-.legend-name:hover::after {
-  content: attr(title);
+.legend-item {
+  position: relative;
+}
+
+.legend-tooltip {
   position: absolute;
-  left: 0;
+  left: 40px;
   top: 100%;
   margin-top: 4px;
   background: var(--bg);
@@ -351,12 +358,20 @@ textarea {
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   font-size: 0.75rem;
-  white-space: nowrap;
   z-index: 100;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   max-width: 250px;
   white-space: normal;
   word-break: break-word;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s, visibility 0.15s;
+  pointer-events: none;
+}
+
+.legend-item:hover .legend-tooltip {
+  opacity: 1;
+  visibility: visible;
 }
 
 .settings label {
@@ -512,99 +527,116 @@ textarea {
   text-overflow: ellipsis;
 }
 
-/* Feature Tracks beneath sequences */
+/* Feature Tracks beneath sequences - grouped by type */
 .feature-tracks-container {
-  margin-top: 0.5rem;
-  padding-left: 85px; /* Align with sequence chars (block-pos + seq-label width) */
+  margin-top: 6px;
+  margin-left: 43px; /* Align with seq-chars (seq-label width + gap) */
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  overflow: hidden; /* Prevent horizontal scrollbar */
 }
 
-.feature-track {
-  position: relative;
-  height: 12px;
+.feature-track-group {
+  margin-bottom: 4px;
+}
+
+.feature-track-type-row {
   margin-bottom: 2px;
 }
 
-.feature-track-label {
-  position: absolute;
-  left: -45px;
-  top: 0;
+.feature-track-type-label {
   font-size: 0.5625rem;
-  font-weight: 500;
-  color: var(--text-muted);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  width: 40px;
-  text-align: right;
+}
+
+.feature-track-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.feature-track-lane {
+  position: relative;
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+}
+
+.feature-track-lane[data-seq="ref"] {
+  opacity: 1;
+}
+
+.feature-track-lane[data-seq="query"] {
+  opacity: 0.7;
 }
 
 .feature-track-bar {
   position: absolute;
-  height: 8px;
-  top: 2px;
+  height: 100%;
+  top: 0;
   border-radius: 2px;
-  opacity: 0.85;
+  opacity: 0.9;
   cursor: pointer;
   transition: opacity 0.15s, transform 0.15s;
 }
 
 .feature-track-bar:hover {
   opacity: 1;
-  transform: scaleY(1.25);
+  transform: scaleY(1.5);
   z-index: 1;
 }
 
-.feature-track-bar[title]::after {
-  content: attr(title);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.625rem;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s;
-  z-index: 10;
+/* Feature track toggles in sidebar */
+.feature-track-toggles {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
 }
 
-.feature-track-bar:hover[title]::after {
-  opacity: 1;
+.feature-track-toggles h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
 }
 
-/* Feature tracks pair container for Ref vs Query */
-.feature-tracks-pair {
+.feature-toggles-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  margin-top: 4px;
-  padding-top: 4px;
-  border-top: 1px dashed var(--border);
+  gap: 0.375rem;
 }
 
-.tracks-row {
+.feature-toggle-item {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
-  align-items: flex-start;
+  padding: 0.375rem 0.5rem;
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 0.25rem 0.25rem 0;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-.tracks-row-label {
-  width: 35px;
-  font-size: 0.5625rem;
-  font-weight: 600;
-  color: var(--text-dim);
-  text-align: right;
-  flex-shrink: 0;
-  padding-top: 2px;
+.feature-toggle-item:hover {
+  background: var(--border);
 }
 
-.tracks-row-content {
+.feature-toggle-item input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.feature-toggle-name {
   flex: 1;
-  min-height: 14px;
-  position: relative;
+  color: var(--text);
 }
 
 /* Custom Feature Modal */
