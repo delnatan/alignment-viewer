@@ -12,6 +12,31 @@ const state = {
   visibleFeatureTypes: {}    // Track visibility of each feature type in tracks
 };
 
+// Theme management
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  setTheme(savedTheme);
+}
+
+function setTheme(theme) {
+  document.body.setAttribute('data-theme', theme);
+  localStorage.setItem('theme', theme);
+  updateThemeButton(theme);
+}
+
+function toggleTheme() {
+  const currentTheme = document.body.getAttribute('data-theme') || 'dark';
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  setTheme(newTheme);
+}
+
+function updateThemeButton(theme) {
+  const btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.textContent = theme === 'dark' ? '☀️ Light' : '🌙 Dark';
+  }
+}
+
 // API helpers
 const api = {
   async get(url) {
@@ -39,6 +64,9 @@ const api = {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  // Initialize theme
+  initTheme();
+
   // Tab switching
   document.querySelectorAll('.tab').forEach(tab => {
     tab.addEventListener('click', () => {
