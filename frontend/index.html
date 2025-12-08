@@ -10,6 +10,7 @@
   <header>
     <h1>Alignment Viewer</h1>
     <div class="header-actions">
+      <button id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">☀️ Light</button>
       <button onclick="exportProject()">Save Project</button>
       <label class="btn">Open Project<input type="file" accept=".json" onchange="importProject(this.files[0])" hidden></label>
     </div>
